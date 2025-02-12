@@ -1,0 +1,65 @@
+version: "3.8"
+
+services:
+  input-service:
+    build: ./input-service
+    container_name: input_service
+    restart: always
+    ports:
+      - "5001:5001"
+    env_file:
+      - ./input-service/.env
+    environment:
+      - DATABASE_URL=postgres://postgres:password@db:5432/pernnilai # Ensure DB connection works
+    depends_on:
+      db:
+        condition: service_healthy
+
+  grade-service:
+    build: ./grade-service
+    container_name: grade_service
+    restart: always
+    ports:
+      - "5002:5002"
+    env_file:
+      - ./grade-service/.env
+    environment:
+      - DATABASE_URL=postgres://postgres:password@db:5432/pernnilai # Ensure DB connection works
+    depends_on:
+      input-service:
+        condition: service_started
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:latest
+    container_name: postgres_db
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: pernnilai
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  frontend:
+    build: ./frontend
+    container_name: frontend_service
+    restart: always
+    ports:
+      - "5173:5173"
+    depends_on:
+      input-service:
+        condition: service_started
+      grade-service:
+        condition: service_started
+
+volumes:
+  db-data:
